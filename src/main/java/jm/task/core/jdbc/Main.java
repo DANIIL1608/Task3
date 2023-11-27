@@ -18,6 +18,6 @@ public class Main {
         user.removeUserById(1);
         System.out.println(user.getAllUsers().toString());
         user.cleanUsersTable();
-        user.dropUsersTable();
+//        user.dropUsersTable();
     }
 }
