@@ -10,63 +10,37 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 
-import static jm.task.core.jdbc.util.Util.*;
+import static jm.task.core.jdbc.util.Util.getSessionFactory;
 
 public class UserDaoHibernateImpl implements UserDao {
-    private Session session;
-    private Statement statement;
     private final Connection connection = Util.getConnection();
     private Transaction transaction;
     @Override
-    public void createUsersTable() {
-        try {
-            statement = connection.createStatement();
-            try {
-                statement.executeUpdate(("CREATE TABLE user (\n" +
-                        "  `ID` INT NOT NULL,\n" +
-                        "  `NAME` VARCHAR(45) NOT NULL,\n" +
-                        "  `LASTNAME` VARCHAR(45) NOT NULL,\n" +
-                        "  `AGE` INT(3) NOT NULL,\n" +
-                        "  PRIMARY KEY (`ID`));"));
-            } catch (Throwable e1) {
-                if (statement != null) {
-                    try {
-                        statement.close();
-                    } catch (Throwable e2) {
-                        e1.addSuppressed(e2);
-                    }
-                }
-                throw e1;
-            }
-            if (statement != null) {
-                statement.close();
-            }
+    public void createUsersTable() throws SQLException{
+        try (Statement statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            statement.executeUpdate(("CREATE TABLE user (\n" +
+                    "  `ID` INT NOT NULL AUTO_INCREMENT,\n" +
+                    "  `NAME` VARCHAR(45) NOT NULL,\n" +
+                    "  `LASTNAME` VARCHAR(45) NOT NULL,\n" +
+                    "  `AGE` INT(3) NOT NULL,\n" +
+                    "  PRIMARY KEY (`ID`));"));
+            connection.commit();
         } catch (SQLException e) {
+            connection.rollback();
             System.err.println("Таблицы закончились, заходи завтра.");
             e.printStackTrace();
         }
     }
 
     @Override
-    public void dropUsersTable() {
-        try {
-            statement = connection.createStatement();
-            try {
-                statement.executeUpdate("DROP TABLE IF EXISTS user;");
-            } catch (Throwable e1) {
-                if (statement != null) {
-                    try {
-                        statement.close();
-                    } catch (Throwable e2) {
-                        e1.addSuppressed(e2);
-                    }
-                }
-                throw e1;
-            }
-            if (statement != null) {
-                statement.close();
-            }
+    public void dropUsersTable() throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            connection.setAutoCommit(false);
+            statement.executeUpdate("DROP TABLE IF EXISTS user;");
+            connection.commit();
         } catch (SQLException e) {
+            connection.rollback();
             System.err.println("Таблица не существует");
             e.printStackTrace();
         }
@@ -74,55 +48,51 @@ public class UserDaoHibernateImpl implements UserDao {
 
     @Override
     public void saveUser(String name, String lastName, byte age) {
-        try {
-            session = getSessionFactory().openSession();
+        try (Session session = getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
             session.persist(new User(name, lastName, age));
             transaction.commit();
-            session.close();
         } catch (Throwable t) {
+            transaction.rollback();
             t.printStackTrace();
         }
     }
 
     @Override
     public void removeUserById(long id) {
-        try {
-            session = getSessionFactory().openSession();
+        try (Session session = getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
             session.delete(session.get(User.class, id));
             transaction.commit();
-            session.close();
         } catch (Throwable t) {
             System.out.println("Ошибка при удалении");
+            transaction.rollback();
             t.printStackTrace();
         }
     }
 
     @Override
     public List<User> getAllUsers() {
-        try {
-            session = getSessionFactory().openSession();
+        List<User> userList = null;
+        try (Session session = getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
-            List<User> userList = session.createQuery("from User").getResultList();
+            userList = session.createQuery("from User", User.class).list();
             transaction.commit();
-            session.close();
-            return userList;
         } catch (Throwable throwable) {
+            transaction.rollback();
             throwable.printStackTrace();
-            throw throwable;
         }
+        return userList;
     }
 
     @Override
     public void cleanUsersTable() {
-        try{
-            session = getSessionFactory().openSession();
+        try (Session session = getSessionFactory().openSession()) {
             transaction = session.beginTransaction();
             session.createQuery("delete User").executeUpdate();
             transaction.commit();
-            session.close();
         } catch (Throwable t) {
+            transaction.rollback();
             t.printStackTrace();
         }
     }
